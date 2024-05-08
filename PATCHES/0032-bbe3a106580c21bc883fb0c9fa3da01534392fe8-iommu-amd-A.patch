@@ -1,0 +1,234 @@
+From d086c20d8378e68d23870ecf9dcc9c317d05ddff Mon Sep 17 00:00:00 2001
+From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Date: Wed, 6 Jul 2022 17:08:22 +0530
+Subject: [PATCH] bbe3a106580c21bc883fb0c9fa3da01534392fe8 - iommu/amd: Add PCI
+ segment support for ivrs_[ioapic/hpet/acpihid] commands . .
+
+iommu/amd: Add PCI segment support for ivrs_[ioapic/hpet/acpihid] commands
+
+By default, PCI segment is zero and can be omitted. To support system
+with non-zero PCI segment ID, modify the parsing functions to allow
+PCI segment ID.
+
+Co-developed-by: Vasant Hegde <vasant.hegde@amd.com>
+Signed-off-by: Vasant Hegde <vasant.hegde@amd.com>
+Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Link: https://lore.kernel.org/r/20220706113825.25582-33-vasant.hegde@amd.com
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ .../admin-guide/kernel-parameters.txt         | 89 ++++++++-----------
+ drivers/iommu/amd/init.c                      | 69 ++++++--------
+ 2 files changed, 62 insertions(+), 96 deletions(-)
+
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 962180711bd8..ffcbe8e1f73b 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -2194,59 +2194,42 @@
+ 
+ 	iucv=		[HW,NET]
+ 
+-	ivrs_ioapic	[HW,X86-64]
+-			Provide an override to the IOAPIC-ID<->DEVICE-ID
+-			mapping provided in the IVRS ACPI table.
+-			By default, PCI segment is 0, and can be omitted.
+-
+-			For example, to map IOAPIC-ID decimal 10 to
+-			PCI segment 0x1 and PCI device 00:14.0,
+-			write the parameter as:
+-				ivrs_ioapic=10@0001:00:14.0
+-
+-			Deprecated formats:
+-			* To map IOAPIC-ID decimal 10 to PCI device 00:14.0
+-			  write the parameter as:
+-				ivrs_ioapic[10]=00:14.0
+-			* To map IOAPIC-ID decimal 10 to PCI segment 0x1 and
+-			  PCI device 00:14.0 write the parameter as:
+-				ivrs_ioapic[10]=0001:00:14.0
+-
+-	ivrs_hpet	[HW,X86-64]
+-			Provide an override to the HPET-ID<->DEVICE-ID
+-			mapping provided in the IVRS ACPI table.
+-			By default, PCI segment is 0, and can be omitted.
+-
+-			For example, to map HPET-ID decimal 10 to
+-			PCI segment 0x1 and PCI device 00:14.0,
+-			write the parameter as:
+-				ivrs_hpet=10@0001:00:14.0
+-
+-			Deprecated formats:
+-			* To map HPET-ID decimal 0 to PCI device 00:14.0
+-			  write the parameter as:
+-				ivrs_hpet[0]=00:14.0
+-			* To map HPET-ID decimal 10 to PCI segment 0x1 and
+-			  PCI device 00:14.0 write the parameter as:
+-				ivrs_ioapic[10]=0001:00:14.0
+-
+-	ivrs_acpihid	[HW,X86-64]
+-			Provide an override to the ACPI-HID:UID<->DEVICE-ID
+-			mapping provided in the IVRS ACPI table.
+-			By default, PCI segment is 0, and can be omitted.
+-
+-			For example, to map UART-HID:UID AMD0020:0 to
+-			PCI segment 0x1 and PCI device ID 00:14.5,
+-			write the parameter as:
+-				ivrs_acpihid=AMD0020:0@0001:00:14.5
+-
+-			Deprecated formats:
+-			* To map UART-HID:UID AMD0020:0 to PCI segment is 0,
+-			  PCI device ID 00:14.5, write the parameter as:
+-				ivrs_acpihid[00:14.5]=AMD0020:0
+-			* To map UART-HID:UID AMD0020:0 to PCI segment 0x1 and
+-			  PCI device ID 00:14.5, write the parameter as:
+-				ivrs_acpihid[0001:00:14.5]=AMD0020:0
++	ivrs_ioapic     [HW,X86-64]
++                        Provide an override to the IOAPIC-ID<->DEVICE-ID
++                        mapping provided in the IVRS ACPI table.
++                        By default, PCI segment is 0, and can be omitted.
++                        For example:
++                        * To map IOAPIC-ID decimal 10 to PCI device 00:14.0
++                          write the parameter as:
++                                ivrs_ioapic[10]=00:14.0
++                        * To map IOAPIC-ID decimal 10 to PCI segment 0x1 and
++                          PCI device 00:14.0 write the parameter as:
++                                ivrs_ioapic[10]=0001:00:14.0
++
++        ivrs_hpet       [HW,X86-64]
++                        Provide an override to the HPET-ID<->DEVICE-ID
++                        mapping provided in the IVRS ACPI table.
++                        By default, PCI segment is 0, and can be omitted.
++                        For example:
++                        * To map HPET-ID decimal 0 to PCI device 00:14.0
++                          write the parameter as:
++                                ivrs_hpet[0]=00:14.0
++                        * To map HPET-ID decimal 10 to PCI segment 0x1 and
++                          PCI device 00:14.0 write the parameter as:
++                                ivrs_ioapic[10]=0001:00:14.0
++
++	ivrs_acpihid    [HW,X86-64]
++                        Provide an override to the ACPI-HID:UID<->DEVICE-ID
++                        mapping provided in the IVRS ACPI table.
++
++                        For example, to map UART-HID:UID AMD0020:0 to
++                        PCI segment 0x1 and PCI device ID 00:14.5,
++                        write the parameter as:
++                                ivrs_acpihid[0001:00:14.5]=AMD0020:0
++
++                        By default, PCI segment is 0, and can be omitted.
++                        For example, PCI device 00:14.5 write the parameter as:
++                                ivrs_acpihid[00:14.5]=AMD0020:0
+ 
+ 	js=		[HW,JOY] Analog joystick
+ 			See Documentation/input/joydev/joystick.rst.
+diff --git a/drivers/iommu/amd/init.c b/drivers/iommu/amd/init.c
+index 15be6ab3efc1..757e1a6d8f0b 100644
+--- a/drivers/iommu/amd/init.c
++++ b/drivers/iommu/amd/init.c
+@@ -3278,24 +3278,21 @@ static int __init parse_amd_iommu_options(char *str)
+ static int __init parse_ivrs_ioapic(char *str)
+ {
+ 	u32 seg = 0, bus, dev, fn;
+-	int id, i;
++	int ret, id, i;
+ 	u32 devid;
+ 
+-	if (sscanf(str, "=%d@%x:%x.%x", &id, &bus, &dev, &fn) == 4 ||
+-	    sscanf(str, "=%d@%x:%x:%x.%x", &id, &seg, &bus, &dev, &fn) == 5)
+-		goto found;
+-
+-	if (sscanf(str, "[%d]=%x:%x.%x", &id, &bus, &dev, &fn) == 4 ||
+-	    sscanf(str, "[%d]=%x:%x:%x.%x", &id, &seg, &bus, &dev, &fn) == 5) {
+-		pr_warn("ivrs_ioapic%s option format deprecated; use ivrs_ioapic=%d@%04x:%02x:%02x.%d instead\n",
+-			str, id, seg, bus, dev, fn);
+-		goto found;
++	ret = sscanf(str, "[%d]=%x:%x.%x", &id, &bus, &dev, &fn);
++	if (ret != 4) {
++		ret = sscanf(str, "[%d]=%x:%x:%x.%x", &id, &seg, &bus, &dev, &fn);
++		if (ret != 5) {
++			pr_err("Invalid command line: ivrs_ioapic%s\n", str);
++			return 1;
++		}
+ 	}
+ 
+ 	pr_err("Invalid command line: ivrs_ioapic%s\n", str);
+ 	return 1;
+ 
+-found:
+ 	if (early_ioapic_map_size == EARLY_MAP_SIZE) {
+ 		pr_err("Early IOAPIC map overflow - ignoring ivrs_ioapic%s\n",
+ 			str);
+@@ -3316,24 +3313,21 @@ static int __init parse_ivrs_ioapic(char *str)
+ static int __init parse_ivrs_hpet(char *str)
+ {
+ 	u32 seg = 0, bus, dev, fn;
+-	int id, i;
++	int ret, id, i;
+ 	u32 devid;
+ 
+-	if (sscanf(str, "=%d@%x:%x.%x", &id, &bus, &dev, &fn) == 4 ||
+-	    sscanf(str, "=%d@%x:%x:%x.%x", &id, &seg, &bus, &dev, &fn) == 5)
+-		goto found;
+-
+-	if (sscanf(str, "[%d]=%x:%x.%x", &id, &bus, &dev, &fn) == 4 ||
+-	    sscanf(str, "[%d]=%x:%x:%x.%x", &id, &seg, &bus, &dev, &fn) == 5) {
+-		pr_warn("ivrs_hpet%s option format deprecated; use ivrs_hpet=%d@%04x:%02x:%02x.%d instead\n",
+-			str, id, seg, bus, dev, fn);
+-		goto found;
++	ret = sscanf(str, "[%d]=%x:%x.%x", &id, &bus, &dev, &fn);
++	if (ret != 4) {
++		ret = sscanf(str, "[%d]=%x:%x:%x.%x", &id, &seg, &bus, &dev, &fn);
++		if (ret != 5) {
++			pr_err("Invalid command line: ivrs_hpet%s\n", str);
++			return 1;
++		}
+ 	}
+ 
+ 	pr_err("Invalid command line: ivrs_hpet%s\n", str);
+ 	return 1;
+ 
+-found:
+ 	if (early_hpet_map_size == EARLY_MAP_SIZE) {
+ 		pr_err("Early HPET map overflow - ignoring ivrs_hpet%s\n",
+ 			str);
+@@ -3356,28 +3350,17 @@ static int __init parse_ivrs_hpet(char *str)
+ static int __init parse_ivrs_acpihid(char *str)
+ {
+ 	u32 seg = 0, bus, dev, fn;
+-	char *hid, *uid, *p, *addr;
+-	char acpiid[ACPIID_LEN] = {0};
+-	int i;
+-
+-	addr = strchr(str, '@');
+-	if (!addr) {
+-		addr = strchr(str, '=');
+-		if (!addr)
+-			goto not_found;
+-
+-		++addr;
+-
+-		if (strlen(addr) > ACPIID_LEN)
+-			goto not_found;
+-
+-		if (sscanf(str, "[%x:%x.%x]=%s", &bus, &dev, &fn, acpiid) == 4 ||
+-		    sscanf(str, "[%x:%x:%x.%x]=%s", &seg, &bus, &dev, &fn, acpiid) == 5) {
+-			pr_warn("ivrs_acpihid%s option format deprecated; use ivrs_acpihid=%s@%04x:%02x:%02x.%d instead\n",
+-				str, acpiid, seg, bus, dev, fn);
+-			goto found;
++	char *hid, *uid, *p;
++	char acpiid[ACPIHID_UID_LEN + ACPIHID_HID_LEN] = {0};
++	int ret, i;
++
++	ret = sscanf(str, "[%x:%x.%x]=%s", &bus, &dev, &fn, acpiid);
++	if (ret != 4) {
++		ret = sscanf(str, "[%x:%x:%x.%x]=%s", &seg, &bus, &dev, &fn, acpiid);
++		if (ret != 5) {
++			pr_err("Invalid command line: ivrs_acpihid(%s)\n", str);
++			return 1;
+ 		}
+-		goto not_found;
+ 	}
+ 
+ 	/* We have the '@', make it the terminator to get just the acpiid */
+-- 
+2.34.1
+
